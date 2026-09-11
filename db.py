@@ -1,102 +1,59 @@
-import sqlite3
 import os
+from supabase import create_client
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "hazards.db")
+TABLE = "hazards"
 
 
-def get_conn():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+def _get_secret(name):
+    val = os.environ.get(name)
+    if val:
+        return val
+    try:
+        import streamlit as st
+        return st.secrets.get(name)
+    except Exception:
+        return None
+
+
+def get_client():
+    url = _get_secret("SUPABASE_URL")
+    key = _get_secret("SUPABASE_KEY")
+    if not url or not key:
+        raise RuntimeError(
+            "SUPABASE_URL / SUPABASE_KEY가 설정되어 있지 않습니다. "
+            "Streamlit Secrets에 등록해주세요."
+        )
+    return create_client(url, key)
 
 
 def init_db():
-    conn = get_conn()
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS hazards (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            location TEXT NOT NULL,
-            category TEXT NOT NULL,
-            risk TEXT NOT NULL,
-            photo_path TEXT,
-            description TEXT,
-            contact_name TEXT,
-            contact_phone TEXT,
-            action_date TEXT
-        )
-        """
-    )
-    conn.commit()
-    conn.close()
+    # Supabase는 테이블을 SQL Editor에서 미리 만들어두는 구조라 별도 초기화 불필요.
+    pass
 
 
 def create_hazard(data: dict) -> int:
-    conn = get_conn()
-    cur = conn.execute(
-        """
-        INSERT INTO hazards
-        (location, category, risk, photo_path, description, contact_name, contact_phone, action_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            data["location"],
-            data["category"],
-            data["risk"],
-            data.get("photo_path"),
-            data.get("description"),
-            data.get("contact_name"),
-            data.get("contact_phone"),
-            data.get("action_date"),
-        ),
-    )
-    conn.commit()
-    new_id = cur.lastrowid
-    conn.close()
-    return new_id
+    client = get_client()
+    res = client.table(TABLE).insert(data).execute()
+    return res.data[0]["id"]
 
 
 def update_hazard(hazard_id: int, data: dict):
-    conn = get_conn()
-    conn.execute(
-        """
-        UPDATE hazards SET
-            location=?, category=?, risk=?, photo_path=?, description=?,
-            contact_name=?, contact_phone=?, action_date=?
-        WHERE id=?
-        """,
-        (
-            data["location"],
-            data["category"],
-            data["risk"],
-            data.get("photo_path"),
-            data.get("description"),
-            data.get("contact_name"),
-            data.get("contact_phone"),
-            data.get("action_date"),
-            hazard_id,
-        ),
-    )
-    conn.commit()
-    conn.close()
+    client = get_client()
+    client.table(TABLE).update(data).eq("id", hazard_id).execute()
 
 
 def delete_hazard(hazard_id: int):
-    conn = get_conn()
-    conn.execute("DELETE FROM hazards WHERE id=?", (hazard_id,))
-    conn.commit()
-    conn.close()
+    client = get_client()
+    client.table(TABLE).delete().eq("id", hazard_id).execute()
 
 
 def get_hazard(hazard_id: int):
-    conn = get_conn()
-    row = conn.execute("SELECT * FROM hazards WHERE id=?", (hazard_id,)).fetchone()
-    conn.close()
-    return dict(row) if row else None
+    client = get_client()
+    res = client.table(TABLE).select("*").eq("id", hazard_id).execute()
+    return res.data[0] if res.data else None
 
 
 def get_all_hazards():
-    conn = get_conn()
-    rows = conn.execute("SELECT * FROM hazards ORDER BY id DESC").fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    client = get_client()
+    res = client.table(TABLE).select("*").order("id", desc=True).execute()
+    return res.data

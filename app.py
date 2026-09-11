@@ -149,10 +149,10 @@ def render_viewer(hazard_id):
     contact_phone = html.escape(hazard.get("contact_phone") or "-")
     action_date = html.escape(hazard.get("action_date") or "-")
 
-    photo_uri = utils.image_to_data_uri(hazard.get("photo_path"))
+    photo_url = hazard.get("photo_path")
     photo_html = (
-        f'<img src="{photo_uri}" style="width:100%; display:block;">'
-        if photo_uri
+        f'<img src="{photo_url}" style="width:100%; display:block;">'
+        if photo_url
         else (
             '<div style="height:160px; display:flex; align-items:center; justify-content:center; '
             'background:#f5f6f8; color:#aaa; font-size:0.85rem;">등록된 사진 없음</div>'
@@ -290,15 +290,15 @@ def render_admin():
                             rc1, rc2, rc3 = st.columns(3)
                             with rc1:
                                 if st.button("↺ 왼쪽 회전", key=f"rotL_{h['id']}"):
-                                    utils.rotate_saved_photo(h["photo_path"], -90)
+                                    utils.rotate_saved_photo(h["id"], -90)
                                     st.rerun()
                             with rc2:
                                 if st.button("↻ 오른쪽 회전", key=f"rotR_{h['id']}"):
-                                    utils.rotate_saved_photo(h["photo_path"], 90)
+                                    utils.rotate_saved_photo(h["id"], 90)
                                     st.rerun()
                             with rc3:
                                 if st.button("📦 용량 줄이기", key=f"compress_{h['id']}"):
-                                    utils.rotate_saved_photo(h["photo_path"], 0)
+                                    utils.rotate_saved_photo(h["id"], 0)
                                     st.success("압축 완료")
                                     st.rerun()
                         except Exception:
@@ -343,6 +343,7 @@ def render_admin():
                             st.rerun()
                     with col_d:
                         if st.button("삭제", key=f"delbtn_{h['id']}", type="primary", use_container_width=True):
+                            utils.delete_photo(h["id"])
                             db.delete_hazard(h["id"])
                             st.success("삭제되었습니다.")
                             st.rerun()
