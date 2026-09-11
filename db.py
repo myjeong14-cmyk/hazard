@@ -38,6 +38,7 @@ def create_hazard(data: dict) -> int:
 
 
 def update_hazard(hazard_id: int, data: dict):
+    data = {k: v for k, v in data.items() if k != "id"}
     client = get_client()
     client.table(TABLE).update(data).eq("id", hazard_id).execute()
 
