@@ -40,6 +40,18 @@ def get_current_port():
 
 
 def get_base_url(port=None):
+    """배포 환경(Streamlit Cloud 등)에서는 PUBLIC_BASE_URL을 우선 사용하고,
+    없으면 로컬 개발용 IP:PORT 방식으로 자동 감지한다."""
+    public_url = os.environ.get("PUBLIC_BASE_URL")
+    if not public_url:
+        try:
+            import streamlit as st
+            public_url = st.secrets.get("PUBLIC_BASE_URL")
+        except Exception:
+            public_url = None
+    if public_url:
+        return public_url.rstrip("/")
+
     if port is None:
         port = get_current_port()
     return f"http://{get_local_ip()}:{port}"
@@ -72,8 +84,16 @@ def get_preview_image(uploaded_file, manual_rotation=0):
     return img
 
 
+def _resize_for_storage(img, max_dim=1600):
+    """저장 용량을 줄이기 위해 긴 변 기준 max_dim을 넘지 않도록 축소."""
+    w, h = img.size
+    if max(w, h) > max_dim:
+        img.thumbnail((max_dim, max_dim), Image.LANCZOS)
+    return img
+
+
 def save_photo(uploaded_file, hazard_id, manual_rotation=0):
-    """업로드된 사진을 EXIF 자동보정 + 수동 회전값을 반영해 JPEG로 저장."""
+    """업로드된 사진을 EXIF 자동보정 + 수동 회전값을 반영해 JPEG로 저장 (용량 최적화 포함)."""
     if uploaded_file is None:
         return None
     uploaded_file.seek(0)
@@ -83,8 +103,9 @@ def save_photo(uploaded_file, hazard_id, manual_rotation=0):
         img = img.rotate(-manual_rotation, expand=True)
     if img.mode in ("RGBA", "P"):
         img = img.convert("RGB")
+    img = _resize_for_storage(img)
     path = os.path.join(PHOTO_DIR, f"photo_{hazard_id}.jpg")
-    img.save(path, "JPEG", quality=90)
+    img.save(path, "JPEG", quality=82, optimize=True)
     return path
 
 
@@ -96,7 +117,8 @@ def rotate_saved_photo(photo_path, degrees):
     img = img.rotate(-degrees, expand=True)
     if img.mode in ("RGBA", "P"):
         img = img.convert("RGB")
-    img.save(photo_path, "JPEG", quality=90)
+    img = _resize_for_storage(img)
+    img.save(photo_path, "JPEG", quality=82, optimize=True)
     return photo_path
 
 

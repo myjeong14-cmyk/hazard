@@ -287,14 +287,19 @@ def render_admin():
                     if h.get("photo_path"):
                         try:
                             st.image(h["photo_path"], width=250)
-                            rc1, rc2 = st.columns(2)
+                            rc1, rc2, rc3 = st.columns(3)
                             with rc1:
-                                if st.button("↺ 사진 왼쪽 회전", key=f"rotL_{h['id']}"):
+                                if st.button("↺ 왼쪽 회전", key=f"rotL_{h['id']}"):
                                     utils.rotate_saved_photo(h["photo_path"], -90)
                                     st.rerun()
                             with rc2:
-                                if st.button("↻ 사진 오른쪽 회전", key=f"rotR_{h['id']}"):
+                                if st.button("↻ 오른쪽 회전", key=f"rotR_{h['id']}"):
                                     utils.rotate_saved_photo(h["photo_path"], 90)
+                                    st.rerun()
+                            with rc3:
+                                if st.button("📦 용량 줄이기", key=f"compress_{h['id']}"):
+                                    utils.rotate_saved_photo(h["photo_path"], 0)
+                                    st.success("압축 완료")
                                     st.rerun()
                         except Exception:
                             pass
