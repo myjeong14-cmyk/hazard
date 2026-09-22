@@ -4,7 +4,7 @@ from datetime import date
 import db
 import utils
 
-st.set_page_config(page_title="현장 위험요소 관리", page_icon="🦺", layout="centered")
+st.set_page_config(page_title="현장 위험요소 관리", layout="centered")
 db.init_db()
 
 query_id = st.query_params.get("id")
@@ -198,7 +198,7 @@ def render_viewer(hazard_id):
 def render_admin():
     render_html(
         '<h1 style="font-size:1.6rem; margin-bottom:0;">🦺 현장 위험요소 관리</h1>'
-        '<p style="color:#888; margin-top:4px; font-size:0.92rem;">등록 · QR 발급 · 수정 · 삭제</p>'
+        '<p style="color:#888; margin-top:4px; font-size:0.92rem;">관리자 페이지 : 등록 · QR 발급 · 수정 · 삭제와 같은 작업을 진행할 수 있습니다.</p>'
     )
 
     tab_list, tab_new = st.tabs(["📋 목록", "➕ 신규 등록"])
@@ -277,7 +277,20 @@ def render_admin():
         for h in hazards:
             risk_color = utils.RISK_COLOR.get(h["risk"], "#888")
             risk_label = utils.RISK_LABEL_KR.get(h["risk"], h["risk"])
-            header = f"[{h['id']}] {h['location']}  ·  {h['category']}  ·  {risk_label}"
+            header = f"{h['location']}"
+            with st.expander(header):
+                render_html(
+                    f"""
+                    <div style="margin:-4px 0 10px 0;">
+                        <span class="badge" style="background:{risk_color}1a; color:{risk_color}; border:1px solid {risk_color}55;">
+                            ● {risk_label}
+                        </span>
+                        <span class="badge badge-category">{h['category']}</span>
+                    </div>
+                    """
+                )
+                edit_key = f"edit_mode_{h['id']}"
+
             with st.expander(header):
                 edit_key = f"edit_mode_{h['id']}"
                 if edit_key not in st.session_state:
