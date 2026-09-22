@@ -279,135 +279,133 @@ def render_admin():
             risk_label = utils.RISK_LABEL_KR.get(h["risk"], h["risk"])
             header = f"{h['location']}"
             with st.expander(header):
-                render_html(
-                    f"""
-                    <div style="margin:-4px 0 10px 0;">
-                        <span class="badge" style="background:{risk_color}1a; color:{risk_color}; border:1px solid {risk_color}55;">
-                            ● {risk_label}
-                        </span>
-                        <span class="badge badge-category">{h['category']}</span>
-                    </div>
-                    """
-                )
-                edit_key = f"edit_mode_{h['id']}"
-
-            with st.expander(header):
-                edit_key = f"edit_mode_{h['id']}"
-                if edit_key not in st.session_state:
-                    st.session_state[edit_key] = False
-
-                if not st.session_state[edit_key]:
-                    if h.get("photo_path"):
-                        try:
-                            st.image(h["photo_path"], width=250)
-                            rc1, rc2, rc3 = st.columns(3)
-                            with rc1:
-                                if st.button("↺ 왼쪽 회전", key=f"rotL_{h['id']}"):
-                                    utils.rotate_saved_photo(h["id"], -90)
-                                    st.rerun()
-                            with rc2:
-                                if st.button("↻ 오른쪽 회전", key=f"rotR_{h['id']}"):
-                                    utils.rotate_saved_photo(h["id"], 90)
-                                    st.rerun()
-                            with rc3:
-                                if st.button("📦 용량 줄이기", key=f"compress_{h['id']}"):
-                                    utils.rotate_saved_photo(h["id"], 0)
-                                    st.success("압축 완료")
-                                    st.rerun()
-                        except Exception:
-                            pass
-
-                    description = html.escape(h.get("description") or "-").replace("\n", "<br>")
-                    contact_name = html.escape(h.get("contact_name") or "-")
-                    contact_phone = html.escape(h.get("contact_phone") or "-")
-                    action_date = html.escape(h.get("action_date") or "-")
-
+                with st.container(border=True):
                     render_html(
                         f"""
-                        <div style="background:#f8f9fb; border-radius:10px; padding:12px 14px; font-size:0.9rem;
-                            color:#333; line-height:1.55; margin:10px 0;">
-                            {description}
-                        </div>
-                        <div class="info-box">
-                            <div class="info-row"><span class="info-label">담당자</span><span class="info-value">{contact_name}</span></div>
-                            <div class="info-row"><span class="info-label">전화번호</span><span class="info-value">{contact_phone}</span></div>
-                            <div class="info-row"><span class="info-label">조치 예정일</span><span class="info-value">{action_date}</span></div>
+                        <div style="margin:0 0 10px 0;">
+                            <span class="badge" style="background:{risk_color}1a; color:{risk_color}; border:1px solid {risk_color}55;">
+                                ● {risk_label}
+                            </span>
+                            <span class="badge badge-category">{h['category']}</span>
                         </div>
                         """
                     )
+                    edit_key = f"edit_mode_{h['id']}"
+                    if edit_key not in st.session_state:
+                        st.session_state[edit_key] = False
 
-                    qr_path, url = utils.generate_qr(h["id"])
-                    render_html("<div style='margin-top:14px;'></div>")
-                    st.image(qr_path, width=150, caption=url)
-                    with open(qr_path, "rb") as f:
-                        st.download_button(
-                            "QR 이미지 다운로드",
-                            f,
-                            file_name=f"qr_{h['id']}.png",
-                            mime="image/png",
-                            key=f"dl_{h['id']}",
-                            use_container_width=True,
+                    if not st.session_state[edit_key]:
+                        if h.get("photo_path"):
+                            try:
+                                st.image(h["photo_path"], width=250)
+                                rc1, rc2, rc3 = st.columns(3)
+                                with rc1:
+                                    if st.button("↺ 왼쪽 회전", key=f"rotL_{h['id']}"):
+                                        utils.rotate_saved_photo(h["id"], -90)
+                                        st.rerun()
+                                with rc2:
+                                    if st.button("↻ 오른쪽 회전", key=f"rotR_{h['id']}"):
+                                        utils.rotate_saved_photo(h["id"], 90)
+                                        st.rerun()
+                                with rc3:
+                                    if st.button("📦 용량 줄이기", key=f"compress_{h['id']}"):
+                                        utils.rotate_saved_photo(h["id"], 0)
+                                        st.success("압축 완료")
+                                        st.rerun()
+                            except Exception:
+                                pass
+
+                        description = html.escape(h.get("description") or "-").replace("\n", "<br>")
+                        contact_name = html.escape(h.get("contact_name") or "-")
+                        contact_phone = html.escape(h.get("contact_phone") or "-")
+                        action_date = html.escape(h.get("action_date") or "-")
+
+                        render_html(
+                            f"""
+                            <div style="background:#f8f9fb; border-radius:10px; padding:12px 14px; font-size:0.9rem;
+                                color:#333; line-height:1.55; margin:10px 0;">
+                                {description}
+                            </div>
+                            <div class="info-box">
+                                <div class="info-row"><span class="info-label">담당자</span><span class="info-value">{contact_name}</span></div>
+                                <div class="info-row"><span class="info-label">전화번호</span><span class="info-value">{contact_phone}</span></div>
+                                <div class="info-row"><span class="info-label">조치 예정일</span><span class="info-value">{action_date}</span></div>
+                            </div>
+                            """
                         )
 
-                    col_e, col_d = st.columns(2)
-                    with col_e:
-                        if st.button("수정", key=f"editbtn_{h['id']}", use_container_width=True):
-                            st.session_state[edit_key] = True
-                            st.rerun()
-                    with col_d:
-                        if st.button("삭제", key=f"delbtn_{h['id']}", type="primary", use_container_width=True):
-                            utils.delete_photo(h["id"])
-                            db.delete_hazard(h["id"])
-                            st.success("삭제되었습니다.")
-                            st.rerun()
-                else:
-                    with st.form(f"edit_form_{h['id']}"):
-                        location = st.text_input("장소명 / 제목", value=h["location"])
-                        category = st.selectbox(
-                            "위험 유형", utils.CATEGORIES,
-                            index=utils.CATEGORIES.index(h["category"]) if h["category"] in utils.CATEGORIES else 0,
-                        )
-                        risk = st.selectbox(
-                            "위험도", utils.RISK_LEVELS,
-                            index=utils.RISK_LEVELS.index(h["risk"]) if h["risk"] in utils.RISK_LEVELS else 0,
-                        )
-                        photo = st.file_uploader("현장 사진 교체 (선택)", type=["png", "jpg", "jpeg"], key=f"photo_{h['id']}")
-                        description = st.text_area("상세 설명", value=h.get("description") or "")
-                        contact_name = st.text_input("담당자 이름", value=h.get("contact_name") or "")
-                        contact_phone = st.text_input("담당자 연락처", value=h.get("contact_phone") or "")
-                        try:
-                            default_date = date.fromisoformat(h["action_date"]) if h.get("action_date") else date.today()
-                        except Exception:
-                            default_date = date.today()
-                        action_date = st.date_input("조치 예정일", value=default_date)
-
-                        col_s, col_c = st.columns(2)
-                        with col_s:
-                            save = st.form_submit_button("저장", use_container_width=True)
-                        with col_c:
-                            cancel = st.form_submit_button("취소", use_container_width=True)
-
-                        if save:
-                            photo_path = utils.save_photo(photo, h["id"]) or h.get("photo_path")
-                            db.update_hazard(
-                                h["id"],
-                                {
-                                    "location": location,
-                                    "category": category,
-                                    "risk": risk,
-                                    "photo_path": photo_path,
-                                    "description": description,
-                                    "contact_name": contact_name,
-                                    "contact_phone": contact_phone,
-                                    "action_date": str(action_date),
-                                },
+                        qr_path, url = utils.generate_qr(h["id"])
+                        render_html("<div style='margin-top:14px;'></div>")
+                        st.image(qr_path, width=150, caption=url)
+                        with open(qr_path, "rb") as f:
+                            st.download_button(
+                                "QR 이미지 다운로드",
+                                f,
+                                file_name=f"qr_{h['id']}.png",
+                                mime="image/png",
+                                key=f"dl_{h['id']}",
+                                use_container_width=True,
                             )
-                            st.session_state[edit_key] = False
-                            st.success("수정되었습니다.")
-                            st.rerun()
-                        if cancel:
-                            st.session_state[edit_key] = False
-                            st.rerun()
+
+                        col_e, col_d = st.columns(2)
+                        with col_e:
+                            if st.button("수정", key=f"editbtn_{h['id']}", use_container_width=True):
+                                st.session_state[edit_key] = True
+                                st.rerun()
+                        with col_d:
+                            if st.button("삭제", key=f"delbtn_{h['id']}", type="primary", use_container_width=True):
+                                utils.delete_photo(h["id"])
+                                db.delete_hazard(h["id"])
+                                st.success("삭제되었습니다.")
+                                st.rerun()
+                    else:
+                        with st.form(f"edit_form_{h['id']}"):
+                            location = st.text_input("장소명 / 제목", value=h["location"])
+                            category = st.selectbox(
+                                "위험 유형", utils.CATEGORIES,
+                                index=utils.CATEGORIES.index(h["category"]) if h["category"] in utils.CATEGORIES else 0,
+                            )
+                            risk = st.selectbox(
+                                "위험도", utils.RISK_LEVELS,
+                                index=utils.RISK_LEVELS.index(h["risk"]) if h["risk"] in utils.RISK_LEVELS else 0,
+                            )
+                            photo = st.file_uploader("현장 사진 교체 (선택)", type=["png", "jpg", "jpeg"], key=f"photo_{h['id']}")
+                            description = st.text_area("상세 설명", value=h.get("description") or "")
+                            contact_name = st.text_input("담당자 이름", value=h.get("contact_name") or "")
+                            contact_phone = st.text_input("담당자 연락처", value=h.get("contact_phone") or "")
+                            try:
+                                default_date = date.fromisoformat(h["action_date"]) if h.get("action_date") else date.today()
+                            except Exception:
+                                default_date = date.today()
+                            action_date = st.date_input("조치 예정일", value=default_date)
+
+                            col_s, col_c = st.columns(2)
+                            with col_s:
+                                save = st.form_submit_button("저장", use_container_width=True)
+                            with col_c:
+                                cancel = st.form_submit_button("취소", use_container_width=True)
+
+                            if save:
+                                photo_path = utils.save_photo(photo, h["id"]) or h.get("photo_path")
+                                db.update_hazard(
+                                    h["id"],
+                                    {
+                                        "location": location,
+                                        "category": category,
+                                        "risk": risk,
+                                        "photo_path": photo_path,
+                                        "description": description,
+                                        "contact_name": contact_name,
+                                        "contact_phone": contact_phone,
+                                        "action_date": str(action_date),
+                                    },
+                                )
+                                st.session_state[edit_key] = False
+                                st.success("수정되었습니다.")
+                                st.rerun()
+                            if cancel:
+                                st.session_state[edit_key] = False
+                                st.rerun()
 
 
 # ---------------------------------------------------------------------------
