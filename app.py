@@ -515,7 +515,7 @@ def render_preview(hazards):
     if pid is None:
         st.info("미리볼 위험요소가 없습니다.")
         return
-    st.caption(f"저장된 내용 (ID {pid}) — QR로 접속하면 이 화면이 보입니다")
+    st.caption(f"QR 접속 시 보이는 화면")
     h = by_id[pid]
     hazard_card(h, h.get("photo_path"))
 
@@ -560,7 +560,7 @@ def main():
             hazards = db.get_all_hazards()
             render_admin(hazards, split=True)
     with right:
-        st.markdown("#### 👁️ 열람용 (QR 스캔 시 화면)")
+        st.markdown("#### 👁️ 열람용")
         with st.container(height=PANE_HEIGHT, border=True):
             render_preview(hazards)
 
