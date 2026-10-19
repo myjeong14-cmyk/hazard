@@ -1,6 +1,7 @@
 import socket
 import os
 import io
+import time
 import qrcode
 from PIL import Image, ImageOps
 
@@ -118,7 +119,9 @@ def _storage_path(hazard_id):
 
 def get_public_url(hazard_id):
     client = db.get_client()
-    return client.storage.from_(BUCKET).get_public_url(_storage_path(hazard_id))
+    url = client.storage.from_(BUCKET).get_public_url(_storage_path(hazard_id))
+    # 같은 파일명으로 덮어쓰기(회전/교체) 해도 브라우저가 옛 사진을 계속 보여주지 않도록 매번 다른 값을 붙인다.
+    return url.split("?")[0] + f"?t={int(time.time())}"
 
 
 def save_photo(uploaded_file, hazard_id, manual_rotation=0):
