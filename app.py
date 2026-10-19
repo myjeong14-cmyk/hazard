@@ -14,6 +14,7 @@ db.init_db()
 SECTION_LIST = "📋 목록"
 SECTION_NEW = "➕ 신규 등록"
 PANE_HEIGHT = 820
+DONE_COLOR = "#43a047"  # 조치완료 표시 색(초록)
 
 
 def render_html(markup: str):
@@ -73,6 +74,23 @@ def inject_css(max_width: int):
             background: white;
         }}
 
+        /* 사진 이전/다음 버튼 줄: 휴대폰에서도 한 줄 유지 */
+        .st-key-photonav {{
+            max-width: 480px;
+            margin: 0 auto;
+        }}
+        .st-key-photonav [data-testid="stHorizontalBlock"] {{
+            flex-wrap: nowrap !important;
+            gap: 0.5rem;
+        }}
+        .st-key-photonav [data-testid="stColumn"] {{
+            min-width: 0 !important;
+        }}
+        .st-key-photonav .stButton>button {{
+            font-size: 1.1rem;
+            padding: 0.3rem 0;
+        }}
+
         /* expander (목록 카드) */
         div[data-testid="stExpander"] {{
             border: 1px solid #ececec;
@@ -130,8 +148,8 @@ def pil_to_data_uri(img) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
-def _slide(label, src, empty_text):
-    """사진 한 장(슬라이드). src가 없으면 안내 문구를 보여준다."""
+def _photo_block(label, src, empty_text):
+    """사진 한 장. src가 없으면 안내 문구를 보여준다."""
     if src:
         body = (
             f'<img src="{html.escape(src, quote=True)}" '
@@ -143,7 +161,7 @@ def _slide(label, src, empty_text):
             f'color:#aaa; font-size:0.9rem;">{empty_text}</div>'
         )
     return (
-        '<div style="flex:0 0 100%; scroll-snap-align:start; position:relative; height:300px; background:#f5f6f8;">'
+        '<div style="position:relative; height:300px; background:#f5f6f8;">'
         f'{body}'
         '<span style="position:absolute; top:10px; left:10px; background:rgba(0,0,0,0.6); color:#fff; '
         f'padding:3px 10px; border-radius:14px; font-size:0.75rem; font-weight:700;">{label}</span>'
@@ -151,12 +169,41 @@ def _slide(label, src, empty_text):
     )
 
 
-def hazard_card(d: dict, photo_src, after_src=None, draft: bool = False):
+def _photo_prev():
+    st.session_state.photo_idx = 0
+
+
+def _photo_next():
+    st.session_state.photo_idx = 1
+
+
+def photo_nav(ctx) -> int:
+    """◀ ▶ 버튼으로 조치 전(0) / 조치 후(1) 사진을 전환. ctx가 바뀌면(다른 항목) 조치 전으로 돌아간다."""
+    ss = st.session_state
+    if ss.get("_photo_ctx") != ctx:
+        ss["_photo_ctx"] = ctx
+        ss["photo_idx"] = 0
+    idx = ss.get("photo_idx", 0)
+    with st.container(key="photonav"):
+        c1, c2, c3 = st.columns([1, 3, 1], vertical_alignment="center")
+        c1.button("❮", key="pn_prev", disabled=(idx == 0), on_click=_photo_prev, width="stretch")
+        name = "조치 전" if idx == 0 else "조치 후"
+        c2.markdown(
+            f'<div style="text-align:center; font-weight:700; font-size:0.95rem;">{name} '
+            f'<span style="color:#999; font-weight:500;">({idx + 1}/2)</span></div>',
+            unsafe_allow_html=True,
+        )
+        c3.button("❯", key="pn_next", disabled=(idx == 1), on_click=_photo_next, width="stretch")
+    return idx
+
+
+def hazard_card(d: dict, photo_src, after_src=None, draft: bool = False, ctx=None):
     """열람용 화면. d: risk/location/category/description/contact_name/contact_phone/action_date
-    사진 영역은 옆으로 넘기면(스와이프) 조치 전 → 조치 후 사진이 나온다.
+    사진 영역은 ❮ ❯ 버튼으로 조치 전 ↔ 조치 후 사진을 전환한다.
     조치 후 사진이 있으면 조치 예정일 대신 '조치완료'를 표시한다."""
     risk = d.get("risk")
-    risk_color = utils.RISK_COLOR.get(risk, "#888")
+    # 조치 후 사진이 있으면(조치완료) 같은 아이콘을 초록색으로 표시
+    risk_color = DONE_COLOR if after_src else utils.RISK_COLOR.get(risk, "#888")
     risk_label = utils.RISK_LABEL_KR.get(risk, risk or "")
 
     location = html.escape(d.get("location") or ("(장소명을 입력하세요)" if draft else ""))
@@ -177,11 +224,11 @@ def hazard_card(d: dict, photo_src, after_src=None, draft: bool = False):
             f'<span class="info-value">{action_date}</span></div>'
         )
 
-    slides = _slide("조치 전 ›", photo_src, "등록된 사진 없음") + _slide("‹ 조치 후", after_src, "조치완료 사진 없음")
-    photo_html = (
-        '<div style="display:flex; overflow-x:auto; scroll-snap-type:x mandatory; '
-        f'-webkit-overflow-scrolling:touch;">{slides}</div>'
-    )
+    idx = photo_nav(ctx)
+    if idx == 0:
+        photo_html = _photo_block("조치 전", photo_src, "등록된 사진 없음")
+    else:
+        photo_html = _photo_block("조치 후", after_src, "조치완료 사진 없음")
 
     footer = "읽기 전용 화면입니다" if not draft else "✏️ 저장 전 미리보기입니다"
     render_html(
@@ -226,7 +273,7 @@ def render_viewer(hazard_id):
     if not hazard:
         st.error("해당 위험요소 정보를 찾을 수 없습니다.")
         return
-    hazard_card(hazard, hazard.get("photo_path"), hazard.get("after_photo_path"))
+    hazard_card(hazard, hazard.get("photo_path"), hazard.get("after_photo_path"), ctx=("view", hazard["id"]))
 
 
 # ---------------------------------------------------------------------------
@@ -423,7 +470,7 @@ def render_edit_form(h, split: bool):
 
 def render_hazard_item(h, split: bool):
     hid = h["id"]
-    risk_color = utils.RISK_COLOR.get(h["risk"], "#888")
+    risk_color = DONE_COLOR if h.get("after_photo_path") else utils.RISK_COLOR.get(h["risk"], "#888")
     risk_label = utils.RISK_LABEL_KR.get(h["risk"], h["risk"])
     editing = st.session_state.editing_id == hid
 
@@ -560,7 +607,7 @@ def render_preview(hazards):
             "action_date": ss.get(f"n_date_{n}", date.today()),
         }
         st.caption("✏️ 입력 중인 내용이 실시간으로 반영됩니다 (아직 저장 전)")
-        hazard_card(draft, ss.get("_new_preview_uri"), None, draft=True)
+        hazard_card(draft, ss.get("_new_preview_uri"), None, draft=True, ctx=("new", ss.nonce))
         return
 
     eid = ss.editing_id
@@ -579,7 +626,7 @@ def render_preview(hazards):
         after_src = ss.get("_edit_after_uri")
         if not after_src and not ss.get(f"e_delafter_{eid}"):
             after_src = h.get("after_photo_path")
-        hazard_card(draft, ss.get("_edit_preview_uri") or h.get("photo_path"), after_src, draft=True)
+        hazard_card(draft, ss.get("_edit_preview_uri") or h.get("photo_path"), after_src, draft=True, ctx=("edit", eid))
         return
 
     pid = ss.preview_id if ss.preview_id in by_id else (hazards[0]["id"] if hazards else None)
@@ -588,7 +635,7 @@ def render_preview(hazards):
         return
     st.caption(f"QR로 접속하면 아래 화면이 노출됩니다.")
     h = by_id[pid]
-    hazard_card(h, h.get("photo_path"), h.get("after_photo_path"))
+    hazard_card(h, h.get("photo_path"), h.get("after_photo_path"), ctx=("view", pid))
 
 
 # ---------------------------------------------------------------------------
@@ -615,7 +662,7 @@ def main():
     with head:
         render_html(
             '<h1 style="font-size:1.6rem; margin-bottom:0;">아차맵 : 위험요소QR 관리</h1>'
-            '<p style="color:#888; margin-top:4px; font-size:0.92rem;">한국산업인력공단 경북지사 3층 상설시험장.</p>'
+            '<p style="color:#888; margin-top:4px; font-size:0.92rem;">한국산업인력공단 경북지사 3층 상설시험장</p>'
         )
     toggle.toggle("화면 분할", key="split_view")
 
