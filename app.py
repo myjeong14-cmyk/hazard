@@ -8,7 +8,7 @@ import streamlit as st
 import db
 import utils
 
-st.set_page_config(page_title="위험요소QR", layout="wide")
+st.set_page_config(page_title="아차맵 위험요소QR", layout="wide")
 db.init_db()
 
 SECTION_LIST = "📋 목록"
@@ -515,7 +515,7 @@ def render_preview(hazards):
     if pid is None:
         st.info("미리볼 위험요소가 없습니다.")
         return
-    st.caption(f"QR 접속 시 보이는 화면")
+    st.caption(f"QR 접속 시 아래 화면이 노출됩니다.")
     h = by_id[pid]
     hazard_card(h, h.get("photo_path"))
 
@@ -543,7 +543,7 @@ def main():
     head, toggle = st.columns([4, 2], vertical_alignment="center")
     with head:
         render_html(
-            '<h1 style="font-size:1.6rem; margin-bottom:0;">위험요소QR 관리</h1>'
+            '<h1 style="font-size:1.6rem; margin-bottom:0;">아차맵 위험요소QR 관리 화면</h1>'
             '<p style="color:#888; margin-top:4px; font-size:0.92rem;">한국산업인력공단 경북지사 3층 상설시험장</p>'
         )
     toggle.toggle("화면 분할 (관리자 | 열람용)", key="split_view")
