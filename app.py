@@ -8,7 +8,7 @@ import streamlit as st
 import db
 import utils
 
-st.set_page_config(page_title="아차맵 위험요소QR", layout="wide")
+st.set_page_config(page_title="위험요소 지도 관리자탭", layout="wide")
 db.init_db()
 
 SECTION_LIST = "📋 목록"
@@ -304,10 +304,6 @@ def cb_delete(hid):
     _flash("success", "삭제되었습니다.")
 
 
-def cb_preview(hid):
-    st.session_state.preview_id = hid
-
-
 # ---------------------------------------------------------------------------
 # 관리자 (CRUD)
 # ---------------------------------------------------------------------------
@@ -400,9 +396,6 @@ def render_hazard_item(h, split: bool):
             if editing:
                 render_edit_form(h, split)
                 return
-
-            if split:
-                st.button("👁 우측에서 미리보기", key=f"pv_{hid}", on_click=cb_preview, args=(hid,))
 
             if h.get("photo_path"):
                 try:
@@ -515,7 +508,7 @@ def render_preview(hazards):
     if pid is None:
         st.info("미리볼 위험요소가 없습니다.")
         return
-    st.caption(f"QR 접속 시 아래 화면이 노출됩니다.")
+    st.caption(f"저장된 내용 (ID {pid}) — QR로 접속하면 이 화면이 보입니다")
     h = by_id[pid]
     hazard_card(h, h.get("photo_path"))
 
@@ -543,8 +536,8 @@ def main():
     head, toggle = st.columns([4, 2], vertical_alignment="center")
     with head:
         render_html(
-            '<h1 style="font-size:1.6rem; margin-bottom:0;">아차맵 위험요소QR 관리 화면</h1>'
-            '<p style="color:#888; margin-top:4px; font-size:0.92rem;">한국산업인력공단 경북지사 3층 상설시험장</p>'
+            '<h1 style="font-size:1.6rem; margin-bottom:0;">🦺 현장 위험요소 관리</h1>'
+            '<p style="color:#888; margin-top:4px; font-size:0.92rem;">관리자 페이지 : 등록 · QR 발급 · 수정 · 삭제와 같은 작업을 진행할 수 있습니다.</p>'
         )
     toggle.toggle("화면 분할 (관리자 | 열람용)", key="split_view")
 
@@ -560,7 +553,7 @@ def main():
             hazards = db.get_all_hazards()
             render_admin(hazards, split=True)
     with right:
-        st.markdown("#### 👁️ 열람용")
+        st.markdown("#### 👁️ 열람용 (QR 스캔 시 화면)")
         with st.container(height=PANE_HEIGHT, border=True):
             render_preview(hazards)
 
