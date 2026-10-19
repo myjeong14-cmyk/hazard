@@ -575,7 +575,7 @@ def render_admin(hazards, split: bool):
     # 조치 후 사진이 등록된 항목 = 조치완료
     todo = [h for h in hazards if not h.get("after_photo_path")]
     done = [h for h in hazards if h.get("after_photo_path")]
-    tab_todo, tab_done = st.tabs([f"🔴 조치 전 ({len(todo)})", f"🟢 조치완료 ({len(done)})"])
+    tab_todo, tab_done = st.tabs([f":red[●] 조치 전 ({len(todo)})", f":green[●] 조치완료 ({len(done)})"])
     with tab_todo:
         if not todo:
             st.caption("조치 전 항목이 없습니다.")
