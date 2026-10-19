@@ -8,7 +8,7 @@ import streamlit as st
 import db
 import utils
 
-st.set_page_config(page_title="위험요소 지도 관리자탭", layout="wide")
+st.set_page_config(page_title="위험요소QR", layout="wide")
 db.init_db()
 
 SECTION_LIST = "📋 목록"
@@ -543,8 +543,8 @@ def main():
     head, toggle = st.columns([4, 2], vertical_alignment="center")
     with head:
         render_html(
-            '<h1 style="font-size:1.6rem; margin-bottom:0;">🦺 현장 위험요소 관리</h1>'
-            '<p style="color:#888; margin-top:4px; font-size:0.92rem;">관리자 페이지 : 등록 · QR 발급 · 수정 · 삭제와 같은 작업을 진행할 수 있습니다.</p>'
+            '<h1 style="font-size:1.6rem; margin-bottom:0;">위험요소QR 관리</h1>'
+            '<p style="color:#888; margin-top:4px; font-size:0.92rem;">한국산업인력공단 경북지사 3층 상설시험장</p>'
         )
     toggle.toggle("화면 분할 (관리자 | 열람용)", key="split_view")
 
