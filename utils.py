@@ -113,18 +113,19 @@ def _to_jpeg_bytes(img):
 # ---------------------------------------------------------------------------
 # Supabase Storage 사진 저장 (영구 저장 — Streamlit Cloud 재시작에도 유지됨)
 # ---------------------------------------------------------------------------
-def _storage_path(hazard_id):
-    return f"hazard_{hazard_id}.jpg"
+def _storage_path(hazard_id, kind="before"):
+    """kind: 'before'(조치 전 사진) / 'after'(조치 후 사진)"""
+    return f"hazard_{hazard_id}_after.jpg" if kind == "after" else f"hazard_{hazard_id}.jpg"
 
 
-def get_public_url(hazard_id):
+def get_public_url(hazard_id, kind="before"):
     client = db.get_client()
-    url = client.storage.from_(BUCKET).get_public_url(_storage_path(hazard_id))
+    url = client.storage.from_(BUCKET).get_public_url(_storage_path(hazard_id, kind))
     # 같은 파일명으로 덮어쓰기(회전/교체) 해도 브라우저가 옛 사진을 계속 보여주지 않도록 매번 다른 값을 붙인다.
     return url.split("?")[0] + f"?t={int(time.time())}"
 
 
-def save_photo(uploaded_file, hazard_id, manual_rotation=0):
+def save_photo(uploaded_file, hazard_id, manual_rotation=0, kind="before"):
     """업로드된 사진을 EXIF 자동보정 + 수동 회전 + 압축 후 Supabase Storage에 업로드."""
     if uploaded_file is None:
         return None
@@ -136,17 +137,17 @@ def save_photo(uploaded_file, hazard_id, manual_rotation=0):
     jpeg_bytes = _to_jpeg_bytes(img)
 
     client = db.get_client()
-    path = _storage_path(hazard_id)
+    path = _storage_path(hazard_id, kind)
     client.storage.from_(BUCKET).upload(
         path, jpeg_bytes, {"content-type": "image/jpeg", "upsert": "true"}
     )
-    return get_public_url(hazard_id)
+    return get_public_url(hazard_id, kind)
 
 
-def rotate_saved_photo(hazard_id, degrees):
+def rotate_saved_photo(hazard_id, degrees, kind="before"):
     """Storage에 저장된 사진을 내려받아 지정 각도(시계방향)만큼 회전 후 같은 자리에 다시 업로드."""
     client = db.get_client()
-    path = _storage_path(hazard_id)
+    path = _storage_path(hazard_id, kind)
     try:
         data = client.storage.from_(BUCKET).download(path)
     except Exception:
@@ -160,12 +161,14 @@ def rotate_saved_photo(hazard_id, degrees):
     client.storage.from_(BUCKET).upload(
         path, jpeg_bytes, {"content-type": "image/jpeg", "upsert": "true"}
     )
-    return get_public_url(hazard_id)
+    return get_public_url(hazard_id, kind)
 
 
-def delete_photo(hazard_id):
+def delete_photo(hazard_id, kind=None):
+    """kind=None 이면 조치 전/후 사진을 모두 삭제."""
+    kinds = ["before", "after"] if kind is None else [kind]
     try:
         client = db.get_client()
-        client.storage.from_(BUCKET).remove([_storage_path(hazard_id)])
+        client.storage.from_(BUCKET).remove([_storage_path(hazard_id, k) for k in kinds])
     except Exception:
         pass

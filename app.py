@@ -130,8 +130,31 @@ def pil_to_data_uri(img) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
-def hazard_card(d: dict, photo_src, draft: bool = False):
-    """열람용 화면. d: risk/location/category/description/contact_name/contact_phone/action_date"""
+def _slide(label, src, empty_text):
+    """사진 한 장(슬라이드). src가 없으면 안내 문구를 보여준다."""
+    if src:
+        body = (
+            f'<img src="{html.escape(src, quote=True)}" '
+            'style="width:100%; height:100%; object-fit:contain; display:block;">'
+        )
+    else:
+        body = (
+            '<div style="height:100%; display:flex; align-items:center; justify-content:center; '
+            f'color:#aaa; font-size:0.9rem;">{empty_text}</div>'
+        )
+    return (
+        '<div style="flex:0 0 100%; scroll-snap-align:start; position:relative; height:300px; background:#f5f6f8;">'
+        f'{body}'
+        '<span style="position:absolute; top:10px; left:10px; background:rgba(0,0,0,0.6); color:#fff; '
+        f'padding:3px 10px; border-radius:14px; font-size:0.75rem; font-weight:700;">{label}</span>'
+        '</div>'
+    )
+
+
+def hazard_card(d: dict, photo_src, after_src=None, draft: bool = False):
+    """열람용 화면. d: risk/location/category/description/contact_name/contact_phone/action_date
+    사진 영역은 옆으로 넘기면(스와이프) 조치 전 → 조치 후 사진이 나온다.
+    조치 후 사진이 있으면 조치 예정일 대신 '조치완료'를 표시한다."""
     risk = d.get("risk")
     risk_color = utils.RISK_COLOR.get(risk, "#888")
     risk_label = utils.RISK_LABEL_KR.get(risk, risk or "")
@@ -141,15 +164,23 @@ def hazard_card(d: dict, photo_src, draft: bool = False):
     description = html.escape(d.get("description") or "-").replace("\n", "<br>")
     contact_name = html.escape(d.get("contact_name") or "-")
     contact_phone = html.escape(d.get("contact_phone") or "-")
-    action_date = html.escape(str(d.get("action_date") or "-"))
 
-    photo_html = (
-        f'<img src="{html.escape(photo_src, quote=True)}" style="width:100%; display:block;">'
-        if photo_src
-        else (
-            '<div style="height:160px; display:flex; align-items:center; justify-content:center; '
-            'background:#f5f6f8; color:#aaa; font-size:0.85rem;">등록된 사진 없음</div>'
+    if after_src:
+        date_row = (
+            '<div class="info-row"><span class="info-label">조치 상태</span>'
+            '<span class="info-value" style="color:#2e7d32;">✅ 조치완료</span></div>'
         )
+    else:
+        action_date = html.escape(str(d.get("action_date") or "-"))
+        date_row = (
+            '<div class="info-row"><span class="info-label">조치 예정일</span>'
+            f'<span class="info-value">{action_date}</span></div>'
+        )
+
+    slides = _slide("조치 전 ›", photo_src, "등록된 사진 없음") + _slide("‹ 조치 후", after_src, "조치완료 사진 없음")
+    photo_html = (
+        '<div style="display:flex; overflow-x:auto; scroll-snap-type:x mandatory; '
+        f'-webkit-overflow-scrolling:touch;">{slides}</div>'
     )
 
     footer = "읽기 전용 화면입니다" if not draft else "✏️ 저장 전 미리보기입니다"
@@ -177,7 +208,7 @@ def hazard_card(d: dict, photo_src, draft: bool = False):
                 <div class="info-box">
                     <div class="info-row"><span class="info-label">담당자</span><span class="info-value">{contact_name}</span></div>
                     <div class="info-row"><span class="info-label">전화번호</span><span class="info-value">{contact_phone}</span></div>
-                    <div class="info-row"><span class="info-label">조치 예정일</span><span class="info-value">{action_date}</span></div>
+                    {date_row}
                 </div>
             </div>
         </div>
@@ -195,7 +226,7 @@ def render_viewer(hazard_id):
     if not hazard:
         st.error("해당 위험요소 정보를 찾을 수 없습니다.")
         return
-    hazard_card(hazard, hazard.get("photo_path"))
+    hazard_card(hazard, hazard.get("photo_path"), hazard.get("after_photo_path"))
 
 
 # ---------------------------------------------------------------------------
@@ -263,24 +294,29 @@ def cb_cancel_edit():
     st.session_state.editing_id = None
 
 
-def cb_save_edit(hid, old_photo):
+def cb_save_edit(hid, old_photo, old_after):
     ss = st.session_state
     photo = ss.get(f"e_photo_{hid}")
+    after = ss.get(f"e_after_{hid}")
     try:
         photo_path = (utils.save_photo(photo, hid) if photo else None) or old_photo
-        db.update_hazard(
-            hid,
-            {
-                "location": ss.get(f"e_loc_{hid}"),
-                "category": ss.get(f"e_cat_{hid}"),
-                "risk": ss.get(f"e_risk_{hid}"),
-                "photo_path": photo_path,
-                "description": ss.get(f"e_desc_{hid}") or "",
-                "contact_name": ss.get(f"e_cname_{hid}") or "",
-                "contact_phone": ss.get(f"e_cphone_{hid}") or "",
-                "action_date": str(ss.get(f"e_date_{hid}")),
-            },
-        )
+        data = {
+            "location": ss.get(f"e_loc_{hid}"),
+            "category": ss.get(f"e_cat_{hid}"),
+            "risk": ss.get(f"e_risk_{hid}"),
+            "photo_path": photo_path,
+            "description": ss.get(f"e_desc_{hid}") or "",
+            "contact_name": ss.get(f"e_cname_{hid}") or "",
+            "contact_phone": ss.get(f"e_cphone_{hid}") or "",
+            "action_date": str(ss.get(f"e_date_{hid}")),
+        }
+        # after_photo_path 컬럼은 조치 후 사진을 올리거나 지울 때만 건드린다.
+        if after:
+            data["after_photo_path"] = utils.save_photo(after, hid, kind="after")
+        elif ss.get(f"e_delafter_{hid}") and old_after:
+            utils.delete_photo(hid, "after")
+            data["after_photo_path"] = None
+        db.update_hazard(hid, data)
     except Exception as e:  # noqa: BLE001
         _flash("error", f"수정 중 오류가 발생했습니다: {e}")
         return
@@ -361,6 +397,16 @@ def render_edit_form(h, split: bool):
         ss["_edit_preview_uri"] = pil_to_data_uri(img)
         if not split:
             st.image(img, caption="교체될 사진", width=250)
+    after = st.file_uploader(
+        "조치 후 사진 (올리면 '조치완료'로 표시됩니다)", type=["png", "jpg", "jpeg"], key=f"e_after_{hid}"
+    )
+    if after is not None:
+        aimg = utils.get_preview_image(after)
+        ss["_edit_after_uri"] = pil_to_data_uri(aimg)
+        if not split:
+            st.image(aimg, caption="조치 후 사진", width=250)
+    if h.get("after_photo_path"):
+        st.checkbox("기존 조치 후 사진 삭제 (조치 전 상태로 되돌리기)", key=f"e_delafter_{hid}")
     st.text_area("상세 설명", value=h.get("description") or "", key=f"e_desc_{hid}")
     st.text_input("담당자 이름", value=h.get("contact_name") or "", key=f"e_cname_{hid}")
     st.text_input("담당자 연락처", value=h.get("contact_phone") or "", key=f"e_cphone_{hid}")
@@ -371,7 +417,7 @@ def render_edit_form(h, split: bool):
     st.date_input("조치 예정일", value=default_date, key=f"e_date_{hid}")
 
     col_s, col_c = st.columns(2)
-    col_s.button("저장", key=f"e_save_{hid}", width="stretch", on_click=cb_save_edit, args=(hid, h.get("photo_path")))
+    col_s.button("저장", key=f"e_save_{hid}", width="stretch", on_click=cb_save_edit, args=(hid, h.get("photo_path"), h.get("after_photo_path")))
     col_c.button("취소", key=f"e_cancel_{hid}", width="stretch", on_click=cb_cancel_edit)
 
 
@@ -397,21 +443,35 @@ def render_hazard_item(h, split: bool):
                 render_edit_form(h, split)
                 return
 
-            if h.get("photo_path"):
-                try:
-                    st.image(h["photo_path"], width=250)
-                    rc1, rc2 = st.columns(2)
-                    if rc1.button("↺ 왼쪽 회전", key=f"rotL_{hid}"):
-                        _rotate(hid, -90)
-                    if rc2.button("↻ 오른쪽 회전", key=f"rotR_{hid}"):
-                        _rotate(hid, 90)
-                except Exception:  # noqa: BLE001
-                    pass
+            for kind, key_name, cap in (
+                ("before", "photo_path", "조치 전"),
+                ("after", "after_photo_path", "조치 후"),
+            ):
+                if h.get(key_name):
+                    try:
+                        st.image(h[key_name], caption=cap, width=250)
+                        rc1, rc2 = st.columns(2)
+                        if rc1.button("↺ 왼쪽 회전", key=f"rotL_{kind}_{hid}"):
+                            _rotate(hid, -90, kind)
+                        if rc2.button("↻ 오른쪽 회전", key=f"rotR_{kind}_{hid}"):
+                            _rotate(hid, 90, kind)
+                    except Exception:  # noqa: BLE001
+                        pass
 
             description = html.escape(h.get("description") or "-").replace("\n", "<br>")
             contact_name = html.escape(h.get("contact_name") or "-")
             contact_phone = html.escape(h.get("contact_phone") or "-")
-            action_date = html.escape(h.get("action_date") or "-")
+            if h.get("after_photo_path"):
+                date_row = (
+                    '<div class="info-row"><span class="info-label">조치 상태</span>'
+                    '<span class="info-value" style="color:#2e7d32;">✅ 조치완료</span></div>'
+                )
+            else:
+                action_date = html.escape(h.get("action_date") or "-")
+                date_row = (
+                    '<div class="info-row"><span class="info-label">조치 예정일</span>'
+                    f'<span class="info-value">{action_date}</span></div>'
+                )
             render_html(
                 f"""
                 <div style="background:#f8f9fb; border-radius:10px; padding:12px 14px; font-size:0.9rem;
@@ -421,7 +481,7 @@ def render_hazard_item(h, split: bool):
                 <div class="info-box">
                     <div class="info-row"><span class="info-label">담당자</span><span class="info-value">{contact_name}</span></div>
                     <div class="info-row"><span class="info-label">전화번호</span><span class="info-value">{contact_phone}</span></div>
-                    <div class="info-row"><span class="info-label">조치 예정일</span><span class="info-value">{action_date}</span></div>
+                    {date_row}
                 </div>
                 """
             )
@@ -440,11 +500,11 @@ def render_hazard_item(h, split: bool):
             col_d.button("삭제", key=f"delbtn_{hid}", type="primary", width="stretch", on_click=cb_delete, args=(hid,))
 
 
-def _rotate(hid, degrees):
+def _rotate(hid, degrees, kind="before"):
     """저장된 사진을 회전하고, 새 주소(캐시 방지 값 포함)를 DB에 반영해 바로 보이게 한다."""
-    new_url = utils.rotate_saved_photo(hid, degrees)
+    new_url = utils.rotate_saved_photo(hid, degrees, kind)
     if new_url:
-        db.update_hazard(hid, {"photo_path": new_url})
+        db.update_hazard(hid, {"after_photo_path" if kind == "after" else "photo_path": new_url})
         st.session_state.preview_id = hid
     st.rerun()
 
@@ -455,6 +515,7 @@ def render_admin(hazards, split: bool):
         "구분", [SECTION_LIST, SECTION_NEW], key="section", horizontal=True, label_visibility="collapsed"
     )
     st.session_state["_edit_preview_uri"] = None
+    st.session_state["_edit_after_uri"] = None
 
     if section == SECTION_NEW:
         render_new_form(split)
@@ -462,8 +523,22 @@ def render_admin(hazards, split: bool):
 
     if not hazards:
         st.info("등록된 위험요소가 없습니다. '신규 등록'에서 추가하세요.")
-    for h in hazards:
-        render_hazard_item(h, split)
+        return
+
+    # 조치 후 사진이 등록된 항목 = 조치완료
+    todo = [h for h in hazards if not h.get("after_photo_path")]
+    done = [h for h in hazards if h.get("after_photo_path")]
+    tab_todo, tab_done = st.tabs([f"🔴 조치 전 ({len(todo)})", f"🟢 조치완료 ({len(done)})"])
+    with tab_todo:
+        if not todo:
+            st.caption("조치 전 항목이 없습니다.")
+        for h in todo:
+            render_hazard_item(h, split)
+    with tab_done:
+        if not done:
+            st.caption("조치완료 항목이 없습니다.")
+        for h in done:
+            render_hazard_item(h, split)
 
 
 # ---------------------------------------------------------------------------
@@ -485,7 +560,7 @@ def render_preview(hazards):
             "action_date": ss.get(f"n_date_{n}", date.today()),
         }
         st.caption("✏️ 입력 중인 내용이 실시간으로 반영됩니다 (아직 저장 전)")
-        hazard_card(draft, ss.get("_new_preview_uri"), draft=True)
+        hazard_card(draft, ss.get("_new_preview_uri"), None, draft=True)
         return
 
     eid = ss.editing_id
@@ -501,16 +576,19 @@ def render_preview(hazards):
             "action_date": ss.get(f"e_date_{eid}", h.get("action_date")),
         }
         st.caption(f"✏️ 수정 중인 내용이 실시간으로 반영됩니다 (ID {eid}, 아직 저장 전)")
-        hazard_card(draft, ss.get("_edit_preview_uri") or h.get("photo_path"), draft=True)
+        after_src = ss.get("_edit_after_uri")
+        if not after_src and not ss.get(f"e_delafter_{eid}"):
+            after_src = h.get("after_photo_path")
+        hazard_card(draft, ss.get("_edit_preview_uri") or h.get("photo_path"), after_src, draft=True)
         return
 
     pid = ss.preview_id if ss.preview_id in by_id else (hazards[0]["id"] if hazards else None)
     if pid is None:
         st.info("미리볼 위험요소가 없습니다.")
         return
-    st.caption(f"저장된 내용 (ID {pid}) — QR로 접속하면 이 화면이 보입니다")
+    st.caption(f"QR로 접속하면 아래 화면이 노출됩니다.")
     h = by_id[pid]
-    hazard_card(h, h.get("photo_path"))
+    hazard_card(h, h.get("photo_path"), h.get("after_photo_path"))
 
 
 # ---------------------------------------------------------------------------
@@ -536,10 +614,10 @@ def main():
     head, toggle = st.columns([4, 2], vertical_alignment="center")
     with head:
         render_html(
-            '<h1 style="font-size:1.6rem; margin-bottom:0;">🦺 현장 위험요소 관리</h1>'
-            '<p style="color:#888; margin-top:4px; font-size:0.92rem;">관리자 페이지 : 등록 · QR 발급 · 수정 · 삭제와 같은 작업을 진행할 수 있습니다.</p>'
+            '<h1 style="font-size:1.6rem; margin-bottom:0;">아차맵 : 위험요소QR 관리</h1>'
+            '<p style="color:#888; margin-top:4px; font-size:0.92rem;">한국산업인력공단 경북지사 3층 상설시험장.</p>'
         )
-    toggle.toggle("화면 분할 (관리자 | 열람용)", key="split_view")
+    toggle.toggle("화면 분할", key="split_view")
 
     if not split:
         render_admin(db.get_all_hazards(), split=False)
@@ -553,7 +631,7 @@ def main():
             hazards = db.get_all_hazards()
             render_admin(hazards, split=True)
     with right:
-        st.markdown("#### 👁️ 열람용 (QR 스캔 시 화면)")
+        st.markdown("#### 👁️ 열람용")
         with st.container(height=PANE_HEIGHT, border=True):
             render_preview(hazards)
 
